@@ -1,0 +1,56 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tensorflow)
+library(keras)
+```
+
+```{r}
+data_1 <- read_csv("data-1.csv")
+data_2 <- read_csv("data-2.csv")
+results_1 <- read_csv("results-1.csv")
+results_2 <- read_csv("results-2.csv")
+```
+
+```{r}
+model <- keras_model_sequential() 
+model %>% 
+  layer_dense(units = 100, activation = "relu", input_shape = c(17814)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 10, activation = "relu") %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 1, activation = "sigmoid")
+
+model %>% 
+  compile(
+    loss = "binary_crossentropy", 
+    optimizer = "adam", 
+    metrics = "accuracy"
+  )
+```
+
+```{r}
+data_1 <- data_1 %>% select(!X1) %>% mutate_all(~replace(., is.nan(.), 0))
+data_2 <- data_2 %>% select(!X1) %>% mutate_all(~replace(., is.nan(.), 0))
+results_1 <- results_1 %>% select(!X1)
+results_2 <- results_2 %>% select(!X1)
+
+data_1 <- as.matrix(sapply(data_1, as.numeric))
+data_2 <- as.matrix(sapply(data_2, as.numeric))
+results_1 <- as.matrix(sapply(results_1, as.numeric))
+results_2 <- as.matrix(sapply(results_2, as.numeric))
+```
+
+```{r}
+model %>%
+  fit(
+    x = data_1, y = results_1,
+    epochs = 20, 
+    validation_split = 0.3
+  )
+```
+
