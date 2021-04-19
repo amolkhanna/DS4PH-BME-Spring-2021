@@ -28,7 +28,7 @@ model %>%
 model %>% 
   compile(
     loss = "binary_crossentropy", 
-    optimizer = "adam", 
+    optimizer = "SGD", 
     metrics = "accuracy"
   )
 ```
@@ -38,6 +38,11 @@ data_1 <- data_1 %>% select(!X1) %>% mutate_all(~replace(., is.nan(.), 0))
 data_2 <- data_2 %>% select(!X1) %>% mutate_all(~replace(., is.nan(.), 0))
 results_1 <- results_1 %>% select(!X1)
 results_2 <- results_2 %>% select(!X1)
+
+write.csv(data_1, "data_1_RowFixed.csv", row.names = FALSE)
+write.csv(data_2, "data_2_RowFixed.csv", row.names = FALSE)
+write.csv(results_1, "results_1_RowFixed.csv", row.names = FALSE)
+write.csv(results_2, "results_2_RowFixed.csv", row.names = FALSE)
 
 data_1 <- as.matrix(sapply(data_1, as.numeric))
 data_2 <- as.matrix(sapply(data_2, as.numeric))

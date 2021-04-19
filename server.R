@@ -9,58 +9,161 @@
 
 library(shiny)
 library(tidyverse)
+library(tensorflow)
+library(keras)
+
+options(shiny.maxRequestSize = 100 * 1024^2)
 
 architecture <<- matrix(ncol = 2)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
   # Variables
-  architectureText <- reactiveValues(text = "Input your architecture, layer by layer!
-                                     Make sure to include an input layer!")
+  architectureText <- reactiveValues(text = "Input your architecture, layer by layer!")
+  lossPlot <- reactiveValues(loss1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))), 
+                             loss2 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))))
+  
   
   # Helper Functions
-  importData <- function(data1, results1, data2, results2, header, sep, quote) {
+  importData <- function(data1, results1, data2, results2) {
     tryCatch({
-      data1 <<- read.csv(data1, 
-                         header = header, 
-                         sep = sep, 
-                         quote = quote)
+      print("Got Here 2")
+      data1 <<- read_csv(data1)
+    }, 
+    error = function(e) {
+      print("Error")
+      stop(safeError(e))
+    })
+    
+    tryCatch({
+      print("Got Here 3")
+      data2 <<- read_csv(data2)
     }, 
     error = function(e) {
       stop(safeError(e))
     })
     
     tryCatch({
-      data2 <<- read.csv(data2,
-                         header = header,
-                         sep = sep, 
-                         quote = quote)
+      results1 <<- read_csv(results1)
     }, 
     error = function(e) {
       stop(safeError(e))
     })
     
     tryCatch({
-      results1 <<- read.csv(results1,
-                         header = header,
-                         sep = sep, 
-                         quote = quote)
+      results2 <<- read_csv(results2)
     }, 
     error = function(e) {
       stop(safeError(e))
     })
+  }
+  
+  runNN <- function(globalIterations, localIterations) {
+    data1 <<- data1 %>% mutate_all(~replace(., is.nan(.), 0))
+    data2 <<- data2 %>% mutate_all(~replace(., is.nan(.), 0))
     
-    tryCatch({
-      results2 <<- read.csv(results2,
-                         header = header,
-                         sep = sep, 
-                         quote = quote)
-    }, 
-    error = function(e) {
-      stop(safeError(e))
-    })
+    data1mat <- as.matrix(sapply(data1, as.numeric))
+    data2mat <- as.matrix(sapply(data2, as.numeric))
+    results1mat <- as.matrix(sapply(results1, as.numeric))
+    results2mat <- as.matrix(sapply(results2, as.numeric))
+    print("Got Here 4")
     
-    print(head(data1))
+    model1 <- keras_model_sequential()
+    model2 <- keras_model_sequential()
+    for (i in 1:nrow(architecture)) {
+      if (i == 1) {
+        if (architecture[i, 2] == 1) {
+          model1 %>% layer_dense(units = architecture[i, 1], activation = "relu", input_shape = c(dim(data1)[2]))
+          model2 %>% layer_dense(units = architecture[i, 1], activation = "relu", input_shape = c(dim(data1)[2]))
+        } else {
+          model1 %>% layer_dense(units = architecture[i, 1], activation = "sigmoid", input_shape = c(dim(data1)[2]))
+          model2 %>% layer_dense(units = architecture[i, 1], activation = "sigmoid", input_shape = c(dim(data1)[2]))
+        }
+      } else {
+        if (architecture[i, 2] == 1) {
+          model1 %>% layer_dense(units = architecture[i, 1], activation = "relu")
+          model2 %>% layer_dense(units = architecture[i, 1], activation = "relu")
+        } else {
+          model1 %>% layer_dense(units = architecture[i, 1], activation = "sigmoid")
+          model2 %>% layer_dense(units = architecture[i, 1], activation = "sigmoid")
+        }
+      }
+    }
+    
+    model1 %>% 
+      compile(
+        loss = "binary_crossentropy", 
+        optimizer = "SGD", 
+      )
+    model2 %>% 
+      compile(
+        loss = "binary_crossentropy", 
+        optimizer = "SGD", 
+      )
+    w <<- get_weights(model1)
+    set_weights(model2, get_weights(model1))
+    
+    for (i in 1:globalIterations) {
+      history1 <- model1 %>%
+        fit(
+          x = data1mat, y = results1mat,
+          epochs = localIterations,
+          validation_split = 0
+        )
+
+      history2 <- model2 %>%
+        fit (
+          x = data2mat, y = results2mat,
+          epochs = localIterations,
+          validation_split = 0
+        )
+      
+      if (i == 1) {
+        h1 <- as.data.frame(history1)
+        h2 <- as.data.frame(history2)
+      } else {
+        h1 <- rbind(h1, as.data.frame(history1))
+        h2 <- rbind(h2, as.data.frame(history2))
+      }
+
+      weights1 <- get_weights(model1)
+      weights2 <- get_weights(model2)
+      for (i in 1:length(weights1)) {
+        if (i %% 2 == 0) {
+          weight1 <- as.array(weights1[[i]])
+          weight2 <- as.array(weights2[[i]])
+          tempList = list(weight1, weight2)
+          w[[i]] <<- Reduce("+", tempList) / length(tempList)
+        } else {
+          weight1 <- as.matrix(weights1[[i]])
+          weight2 <- as.matrix(weights2[[i]])
+          tempList  = list(weight1, weight2)
+          w[[i]] <<- Reduce("+", tempList) / length(tempList)
+        }
+      }
+
+      set_weights(model1, w)
+      set_weights(model2, w)
+    }
+    
+    hist1 <<- h1
+    hist2 <<- h2
+  }
+  
+  generateGraphs <- function() {
+    hist1$id <<- 1:nrow(hist1)
+    hist2$id <<- 1:nrow(hist2)
+    
+    l1 <- ggplot(data = hist1, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+    l2 <- ggplot(data = hist2, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+
+    l1 <- l1 + ggtitle("Client 1 Loss") + xlab("Total Epochs") + ylab("Loss")
+    l2 <- l2 + ggtitle("Client 2 Loss") + xlab("Total Epochs") + ylab("Loss")
+    
+    l1 <- l1 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
+    l2 <- l2 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
+    lossPlot$loss1 <- l1
+    lossPlot$loss2 <- l2
   }
   
   # Observer Functions
@@ -129,16 +232,36 @@ shinyServer(function(input, output) {
     req(input$dataFile2)
     req(input$resultsFile2)
     tryCatch({
+      print("Got Here")
       importData(input$dataFile1$datapath, input$resultsFile1$datapath, 
-                 input$dataFile2$datapath, input$resultsFile2$datapath, 
-                 input$header, input$sep, input$quote)
+                 input$dataFile2$datapath, input$resultsFile2$datapath)
     }, error = function(e) {
       stop(safeError(e))
+    })
+    
+    tryCatch({
+      runNN(input$globalIterations, input$localIterations)
+    }, error = function(e) {
+      stop(safeError(e))
+    })
+    
+    tryCatch({
+      generateGraphs()
+    }, error = function(e) {
+      stop(safeError (e))
     })
   })
   
   # Output Functions
   output$currentArchitecture <- renderText({
     return(architectureText$text)
+  })
+  
+  output$loss1 <- renderPlot({
+    return(lossPlot$loss1)
+  })
+  
+  output$loss2 <- renderPlot({
+    return(lossPlot$loss2)
   })
 })

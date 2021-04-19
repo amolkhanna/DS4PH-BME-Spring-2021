@@ -13,7 +13,7 @@ library(shiny)
 shinyUI(fluidPage(
   
   # Application title
-  titlePanel("Multi-Layer Perceptron Federated Learning Simulator"),
+  titlePanel("Binary Prediction Federated Learning Simulator"),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
@@ -38,17 +38,6 @@ shinyUI(fluidPage(
                  accept = c("text/csv",
                             "text/comma-separated-values,text/plain", 
                             ".csv")),
-       
-       checkboxInput("header", "Header", TRUE), 
-       radioButtons("sep", "Separator",
-                    choices = c(Comma = ",",
-                                Semicolon = ";",
-                                Tab = "\t"),
-                    selected = ","),
-       radioButtons("quote", "Quote", choices = c(None = "",
-                                                  "Double Quote" = '"', 
-                                                  "Single Quote" = "'"), 
-                    selected = '"'),
        tags$hr(),
        
        numericInput("layerSize", label="Layer Size", value = 1),
@@ -72,7 +61,8 @@ shinyUI(fluidPage(
     
     # Show a plot of the generated distribution
     mainPanel(
-       
+       plotOutput("loss1"),
+       plotOutput("loss2")
     )
   )
 ))
