@@ -1,0 +1,14 @@
+name: federatedlearningsim
+title: federatedlearningsim
+username:
+account: amolkhanna
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3996019
+bundleId: 4493262
+url: https://amolkhanna.shinyapps.io/federatedlearningsim/
+when: 1618881439.48928
+lastSyncTime: 1618881439.48928
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data-1.csv|data-2.csv|data_1_RowFixed.csv|data_2_RowFixed.csv|NNTest.nb.html|NNTest.Rmd|README.md|results-1.csv|results-2.csv|results_1_RowFixed.csv|results_2_RowFixed.csv

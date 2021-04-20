@@ -11,6 +11,7 @@ library(shiny)
 library(tidyverse)
 library(tensorflow)
 library(keras)
+library(reticulate)
 
 options(shiny.maxRequestSize = 100 * 1024^2)
 
@@ -18,6 +19,11 @@ architecture <<- matrix(ncol = 2)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
+
+  reticulate::virtualenv_create(envname = 'r-reticulate', python = 'python')
+  reticulate::virtualenv_install('r-reticulate', c('numpy'), ignore_installed = FALSE)
+  reticulate::use_virtualenv(virtualenv = 'r-reticulate', required = TRUE)
+  
   # Variables
   architectureText <- reactiveValues(text = "Input your architecture, layer by layer!")
   lossPlot <- reactiveValues(loss1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))), 
