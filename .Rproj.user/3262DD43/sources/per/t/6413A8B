@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1618874672942.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1004666828",
+    "id" : "6413A8B",
+    "lastKnownWriteTime" : 1618872639,
+    "last_content_update" : 1618872639,
+    "path" : "C:/Users/amolk/OneDrive/OneDrive Documents/College/Johns Hopkins University/Sophomore Year/Advanced Biomedical Data Science/Project/DS4PH-BME-Spring-2021/server.R",
+    "project_path" : "server.R",
+    "properties" : {
+        "cursorPosition" : "13,0",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

@@ -21,28 +21,26 @@ architecture <<- matrix(ncol = 2)
 shinyServer(function(input, output) {
 
   reticulate::virtualenv_create(envname = 'r-reticulate', python = 'python')
-  reticulate::virtualenv_install('r-reticulate', c('numpy'), ignore_installed = FALSE)
+  reticulate::virtualenv_install('r-reticulate', c('numpy', 'tensorflow', 'keras'), ignore_installed = FALSE)
   reticulate::use_virtualenv(virtualenv = 'r-reticulate', required = TRUE)
   
   # Variables
   architectureText <- reactiveValues(text = "Input your architecture, layer by layer!")
-  lossPlot <- reactiveValues(loss1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))), 
+  lossPlot <- reactiveValues(ll1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))), 
+                             ll2 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))),
+                             loss1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))),
                              loss2 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))))
-  
   
   # Helper Functions
   importData <- function(data1, results1, data2, results2) {
     tryCatch({
-      print("Got Here 2")
       data1 <<- read_csv(data1)
     }, 
     error = function(e) {
-      print("Error")
       stop(safeError(e))
     })
     
     tryCatch({
-      print("Got Here 3")
       data2 <<- read_csv(data2)
     }, 
     error = function(e) {
@@ -72,7 +70,6 @@ shinyServer(function(input, output) {
     data2mat <- as.matrix(sapply(data2, as.numeric))
     results1mat <- as.matrix(sapply(results1, as.numeric))
     results2mat <- as.matrix(sapply(results2, as.numeric))
-    print("Got Here 4")
     
     model1 <- keras_model_sequential()
     model2 <- keras_model_sequential()
@@ -99,52 +96,72 @@ shinyServer(function(input, output) {
     model1 %>% 
       compile(
         loss = "binary_crossentropy", 
-        optimizer = "SGD", 
+        optimizer = "SGD" 
       )
     model2 %>% 
       compile(
         loss = "binary_crossentropy", 
-        optimizer = "SGD", 
+        optimizer = "SGD" 
       )
     w <<- get_weights(model1)
     set_weights(model2, get_weights(model1))
     
     for (i in 1:globalIterations) {
       history1 <- model1 %>%
+        evaluate(
+          x = data1mat, y = results1mat, 
+          verbose = 0
+        )
+      
+      history2 <- model2 %>%
+        evaluate(
+          x = data2mat, y = results2mat, 
+          verbose = 0
+        )
+      
+      ht1 <- model1 %>%
         fit(
           x = data1mat, y = results1mat,
           epochs = localIterations,
-          validation_split = 0
+          validation_split = 0, 
+          verbose = 0
         )
 
-      history2 <- model2 %>%
+      ht2 <- model2 %>%
         fit (
           x = data2mat, y = results2mat,
           epochs = localIterations,
-          validation_split = 0
+          validation_split = 0, 
+          verbose = 0
         )
       
       if (i == 1) {
         h1 <- as.data.frame(history1)
         h2 <- as.data.frame(history2)
+        
+        hl1 <- as.data.frame(ht1)
+        hl2 <- as.data.frame(ht2)
       } else {
         h1 <- rbind(h1, as.data.frame(history1))
         h2 <- rbind(h2, as.data.frame(history2))
+        
+        hl1 <- rbind(hl1, as.data.frame(ht1))
+        hl2 <- rbind(hl2, as.data.frame(ht2))
       }
 
       weights1 <- get_weights(model1)
       weights2 <- get_weights(model2)
       for (i in 1:length(weights1)) {
         if (i %% 2 == 0) {
-          weight1 <- as.array(weights1[[i]])
-          weight2 <- as.array(weights2[[i]])
+          weight1 <- as.array(weights1[[i]]) * (nrow(data1mat) / (nrow(data1mat) + nrow(data2mat)))
+          weight2 <- as.array(weights2[[i]]) * (nrow(data2mat) / (nrow(data1mat) + nrow(data2mat)))
           tempList = list(weight1, weight2)
-          w[[i]] <<- Reduce("+", tempList) / length(tempList)
+          w[[i]] <<- Reduce("+", tempList)
         } else {
-          weight1 <- as.matrix(weights1[[i]])
-          weight2 <- as.matrix(weights2[[i]])
+          weight1 <- as.matrix(weights1[[i]]) * (nrow(data1mat) / (nrow(data1mat) + nrow(data2mat)))
+          weight2 <- as.matrix(weights2[[i]]) * (nrow(data2mat) / (nrow(data1mat) + nrow(data2mat)))
           tempList  = list(weight1, weight2)
-          w[[i]] <<- Reduce("+", tempList) / length(tempList)
+          w[[i]] <<- Reduce("+", tempList)
         }
       }
 
@@ -154,22 +171,36 @@ shinyServer(function(input, output) {
     
     hist1 <<- h1
     hist2 <<- h2
+    histloss1 <<- hl1
+    histloss2 <<- hl2
   }
   
   generateGraphs <- function() {
     hist1$id <<- 1:nrow(hist1)
     hist2$id <<- 1:nrow(hist2)
+    histloss1$id <<- 1:nrow(histloss1)
+    histloss2$id <<- 1:nrow(histloss2)
     
-    l1 <- ggplot(data = hist1, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
-    l2 <- ggplot(data = hist2, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
-
-    l1 <- l1 + ggtitle("Client 1 Loss") + xlab("Total Epochs") + ylab("Loss")
-    l2 <- l2 + ggtitle("Client 2 Loss") + xlab("Total Epochs") + ylab("Loss")
+    l1 <- ggplot(data = hist1, aes(id, history1)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+    l2 <- ggplot(data = hist2, aes(id, history2)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+    loss1 <- ggplot(data = histloss1, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+    loss2 <- ggplot(data = histloss2, aes(id, value)) + geom_line(color = "red") + scale_y_continuous(trans = 'log10')
+    
+    loss1 <- loss1 + ggtitle("Training Loss: Server 1") + xlab("Total Epochs") + ylab("Loss")
+    loss2 <- loss2 + ggtitle("Training Loss: Server 2") + xlab("Total Epochs") + ylab("Loss")
+    
+    l1 <- l1 + ggtitle("Federated Loss: Server 1") + xlab("Federated Epochs") + ylab("Loss")
+    l2 <- l2 + ggtitle("Federated Loss: Server 2") + xlab("Federated Epochs") + ylab("Loss")
+    
+    loss1 <- loss1 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
+    loss2 <- loss2 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
     
     l1 <- l1 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
     l2 <- l2 + theme(plot.title = element_text(size = rel(2.5))) + theme(axis.title.x = element_text(size = rel(1.75))) + theme(axis.title.y = element_text(size = rel(1.75)))
-    lossPlot$loss1 <- l1
-    lossPlot$loss2 <- l2
+    lossPlot$ll1 <- l1
+    lossPlot$ll2 <- l2
+    lossPlot$loss1 <- loss1
+    lossPlot$loss2 <- loss2
   }
   
   # Observer Functions
@@ -211,8 +242,7 @@ shinyServer(function(input, output) {
   observeEvent(input$delete, {
     if (nrow(architecture) == 1) {
       architecture[1,] <<- c(NA, NA)
-      architectureText$text <- "Input your architecture, layer by layer! 
-      Make sure to include an input layer!"
+      architectureText$text <- "Input your architecture, layer by layer!"
     } else {
       architecture <<- matrix(architecture[-(nrow(architecture)),], ncol = 2)
       
@@ -238,7 +268,6 @@ shinyServer(function(input, output) {
     req(input$dataFile2)
     req(input$resultsFile2)
     tryCatch({
-      print("Got Here")
       importData(input$dataFile1$datapath, input$resultsFile1$datapath, 
                  input$dataFile2$datapath, input$resultsFile2$datapath)
     }, error = function(e) {
@@ -255,12 +284,16 @@ shinyServer(function(input, output) {
       generateGraphs()
     }, error = function(e) {
       stop(safeError (e))
-    })
+  })
   })
   
   # Output Functions
   output$currentArchitecture <- renderText({
     return(architectureText$text)
+  })
+  
+  output$running <- renderText({
+    return(running$text)
   })
   
   output$loss1 <- renderPlot({
@@ -269,5 +302,13 @@ shinyServer(function(input, output) {
   
   output$loss2 <- renderPlot({
     return(lossPlot$loss2)
+  })
+  
+  output$ll1 <- renderPlot({
+    return(lossPlot$ll1)
+  })
+  
+  output$ll2 <- renderPlot({
+    return(lossPlot$ll2)
   })
 })
