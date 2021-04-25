@@ -20,16 +20,16 @@ architecture <<- matrix(ncol = 2)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
 
-  reticulate::virtualenv_create(envname = 'r-reticulate', python = 'python')
-  reticulate::virtualenv_install('r-reticulate', c('numpy', 'tensorflow', 'keras'), ignore_installed = FALSE)
-  reticulate::use_virtualenv(virtualenv = 'r-reticulate', required = TRUE)
-  
   # Variables
   architectureText <- reactiveValues(text = "Input your architecture, layer by layer!")
   lossPlot <- reactiveValues(ll1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))), 
                              ll2 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))),
                              loss1 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))),
                              loss2 = ggplot() + ggtitle("Run Your Model To Get A Loss Plot!") + theme(plot.title = element_text(size = rel(2.5))))
+  
+  reticulate::virtualenv_create(envname = 'r-reticulate', python = 'python')
+  reticulate::virtualenv_install('r-reticulate', c('numpy', 'tensorflow', 'keras'), ignore_installed = FALSE)
+  reticulate::use_virtualenv(virtualenv = 'r-reticulate', required = TRUE)
   
   # Helper Functions
   importData <- function(data1, results1, data2, results2) {
